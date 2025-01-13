@@ -183,8 +183,8 @@ class TrainSpeedControl_D(Env):
 
         if self.terminated:
             self.reward += 1000
-        elif self.truncated:
-            self.reward -= 1000
+        # elif self.truncated:
+            # self.reward -= 1000
 
         self.prev_acceleration = self.acceleration
 
@@ -274,7 +274,7 @@ class TrainSpeedControl_D(Env):
         # print("reward_stop:", reward_stop
 
         reward_list = [
-            -reward_forward, -reward_energy, -reward_time, -reward_jerk, -reward_shock]
+            -reward_forward, -reward_time, -reward_energy, -reward_jerk, -reward_shock]
         # print("reward_list:", reward_list)
         return reward_list
 

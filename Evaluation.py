@@ -115,10 +115,10 @@ def main():
     plt.grid(True)  # Add grid
 
     plt.figure(2)
-    plt.plot(positions, actions, label='Velocity-Time plot')
-    plt.xlabel('Position')
+    plt.plot(times, actions, label='Velocity-Time plot')
+    plt.xlabel('Timew')
     plt.ylabel('Action')
-    plt.title('Velocity-Position plot')
+    plt.title('Action-Times plot')
     plt.legend()
     plt.grid(True)  # Add grid
 
