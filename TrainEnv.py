@@ -166,7 +166,7 @@ class TrainSpeedControl_D(Env):
 
         # Judge terminated condition
         self.terminated = bool(
-            self.Running_time - 10 < self.time < self.Running_time + 10 and self.station - 20 < self.position < self.station + 20 and self.velocity < 1)
+            self.Running_time - 20 < self.time < self.Running_time + 20 and self.station - 20 < self.position < self.station + 20 and self.velocity < 1)
 
         self.truncated = bool(self.position >= self.track_length or self.time > self.Episode_time)
 
@@ -180,11 +180,13 @@ class TrainSpeedControl_D(Env):
 
         if self.time == self.Running_time:
             self.reward -= (self.velocity) * 10
+        if self.position == self.station:
+            self.reward -= (self.velocity) * 10
 
         if self.terminated:
             self.reward += 1000
-        # elif self.truncated:
-            # self.reward -= 1000
+        elif self.truncated:
+            self.reward -= 1000
 
         self.prev_acceleration = self.acceleration
 
