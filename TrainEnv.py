@@ -5,8 +5,6 @@ from gymnasium.core import ObsType
 from gymnasium.spaces import Discrete, Box, Dict, Tuple, MultiBinary, MultiDiscrete
 import numpy as np
 import random
-
-
 class TrainSpeedControl_D(Env):
     def __init__(self):
         # Fixed parameters
@@ -15,11 +13,11 @@ class TrainSpeedControl_D(Env):
         self.Max_traction_F = 0.0  # Max traction force in kN
         self.Episode_time = 200.0  # Total episode time in seconds
         self.Running_time = 140.0
-        self.Max_speed = 22.222
 
         # Environmental parameters
         self.track_length = 2500.0  # Track length in meters
         self.station = 2000.0
+        self.max_speed = 22.222
 
         # Specs (fixed properties of the environment)
         self.specs = {
@@ -48,7 +46,7 @@ class TrainSpeedControl_D(Env):
             self.specs['velocity_limits'][0],
             self.specs['velocity_limits'][0]))
 
-        self.action_space = Discrete(4)  # Actions: 0 (Accelerate), 1 (Brake), 2 (Hold), 3 (Keep)
+        self.action_space = Discrete(4)
         self.observation_space = Box(low=self.state_min, high=self.state_max, dtype=np.float64)
 
         # Reward structure (fixed)
@@ -76,7 +74,7 @@ class TrainSpeedControl_D(Env):
         self.position = 0.0  # Starting position in meters
         self.distance_left = self.station  # Reset distance left to full track length
         self.velocity = 0.0  # Initial velocity in m/s
-        self.speed_limit = self.Max_speed  # Initial speed limit (can be randomized later if needed)
+        self.speed_limit = self.max_speed  # Initial speed limit (can be randomized later if needed)
         self.acceleration = 0.0  # Initial acceleration in m/s^2
         self.prev_acceleration = 0.0  # Previous acceleration in m/s^2
         self.traction_power = 0.0  # Traction power in kW
@@ -132,12 +130,12 @@ class TrainSpeedControl_D(Env):
         :return: state, reward, done, info
         """
 
-        assert self.action_space.contains(action), \
-            f'{action} ({type(action)}) invalid shape or bounds'
+        # assert self.action_space.contains(action), \
+        #     f'{action} ({type(action)}) invalid shape or bounds'
 
         self.action_clipped = action
-        # self.action_clipped = 1.0
-        # if self.time < 75:
+        # self.action_clipped = 0
+        # if self.time < 80:
         #     self.action_clipped = 1.0
         # else:
         #     self.action_clipped = -1.0
@@ -145,28 +143,29 @@ class TrainSpeedControl_D(Env):
         # # print("positon:", self.position)
         self.update_motion(self.action_clipped)
 
+
         # s = 0.5 * a * t² + v0 * t + s0
         # self.position += (0.5 * self.acceleration * self.dt ** 2 +
         #                   self.velocity * self.dt)
         # # v = a * t + v0
         # self.velocity += self.acceleration * self.dt
 
+
         # Update others
         self.time += self.dt
-        self.time_left = max(self.Running_time - self.time, 0)
+        self.time_left = self.Running_time - self.time
 
-        self.distance_left = max(self.station - self.position, 0)
+        self.distance_left = self.station - self.position
         # self.jerk = abs(action_clipped - self.prev_action)
         # self.prev_action = self.action_clipped
 
         if self.station <= self.position:
             self.speed_limit = 0
         else:
-            self.speed_limit = self.Max_speed
+            self.speed_limit = self.max_speed
 
         # Judge terminated condition
-        self.terminated = bool(
-            self.Running_time - 20 < self.time < self.Running_time + 20 and self.station - 20 < self.position < self.station + 20 and self.velocity < 1)
+        self.terminated = bool(self.position - 20 <= self.station <= self.position + 20 and self.Running_time - 20 <= self.time <= self.Running_time + 20 and self.velocity < 0.1)
 
         self.truncated = bool(self.position >= self.track_length or self.time > self.Episode_time)
 
@@ -175,18 +174,14 @@ class TrainSpeedControl_D(Env):
         # print("reward_list:", reward_list)
         self.reward = np.array(reward_list).dot(np.array(self.reward_weights))
 
-        if self.terminated or self.truncated:
-            self.episode_count += 1
-
-        if self.time == self.Running_time:
-            self.reward -= (self.velocity) * 10
-        if self.position == self.station:
-            self.reward -= (self.velocity) * 10
-
         if self.terminated:
+            self.episode_count += 1
             self.reward += 1000
-        elif self.truncated:
-            self.reward -= 1000
+            self.reward -= (self.velocity ** 2 + abs(self.position - self.station) + abs(self.time - self.Running_time))
+
+        if self.truncated:
+            self.episode_count += 1
+            self.reward -= (self.velocity ** 2 + abs(self.position - self.station) + abs(self.time - self.Running_time))
 
         self.prev_acceleration = self.acceleration
 
@@ -276,7 +271,7 @@ class TrainSpeedControl_D(Env):
         # print("reward_stop:", reward_stop
 
         reward_list = [
-            -reward_forward, -reward_time, -reward_energy, -reward_jerk, -reward_shock]
+            -reward_forward, -reward_energy, -reward_time, -reward_jerk, -reward_shock]
         # print("reward_list:", reward_list)
         return reward_list
 
@@ -296,12 +291,12 @@ class TrainSpeedControl_D(Env):
 
         # If power exceeds the maximum power limit, then limit the traction force
         if speed > 0:
-            if (f_t * speed / 3.6) > p_max:
-                f_t = p_max / (speed / 3.6)
+          if (f_t * speed / 3.6) > p_max:
+              f_t = p_max / (speed / 3.6)
 
-            # Additional condition to limit the traction force
-            if f_t > (263.9 * 43 * 50 / (speed ** 2)):
-                f_t = 263.9 * 43 * 50 / (speed ** 2)
+          # Additional condition to limit the traction force
+          if f_t > (263.9 * 43 * 50 / (speed ** 2)):
+              f_t = 263.9 * 43 * 50 / (speed ** 2)
         if speed == 0:
             f_t = 263.9  # Set traction force to initial value if speed is 0
 
@@ -349,9 +344,12 @@ class TrainSpeedControl_D(Env):
         speed = self.velocity * 3.6  # Convert speed from m/s to km/h
 
         f_r = (6.4 * self.Mass + 130 * n + 0.14 * self.Mass * abs(speed) +
-               (0.046 + 0.0065 * (N - 1)) * A * speed ** 2) / 1000
+              (0.046 + 0.0065 * (N - 1)) * A * speed**2) / 1000
         # f_r = 0.1 * f_r
         return f_r
 
+
     def render(self):
         pass
+
+
